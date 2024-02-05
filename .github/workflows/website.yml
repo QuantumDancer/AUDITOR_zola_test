@@ -21,7 +21,8 @@ jobs:
       - name: Get URL to GitHub Pages
         env:
           GH_TOKEN: ${{ github.token }}
-        run: echo "GITHUB_PAGES_URL=$(gh api repos/$GITHUB_REPOSITORY/pages --jq '.html_url')" >> $GITHUB_ENV
+        # run: echo "GITHUB_PAGES_URL=$(gh api repos/$GITHUB_REPOSITORY/pages --jq '.html_url')" >> $GITHUB_ENV
+        run: echo "GITHUB_PAGES_URL=https://quantumdancer.github.io/AUDITOR_zola_test/" >> $GITHUB_ENV
 
       - name: Checkout main/tag
         uses: actions/checkout@v4
