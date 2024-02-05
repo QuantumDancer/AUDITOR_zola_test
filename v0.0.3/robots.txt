@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+Allow: /
+Sitemap: https://quantumdancer.github.io/AUDITOR_zola_test//v0.0.3/sitemap.xml
