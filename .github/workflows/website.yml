@@ -12,7 +12,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build_and_push:
     runs-on: ubuntu-latest
     steps:
       - name: Set RELEASE_VERSION env
@@ -45,14 +45,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           clean: false
 
-      # Only for tag push: Update latest to new release version
-
-      # The "cleanup old checkout" step is needed because of this bug: https://github.com/actions/checkout/issues/1014
-      - name: Cleanup old checkout
-        if: startsWith(github.ref, 'refs/tags/')
-        # run: chmod +w -R ${GITHUB_WORKSPACE}; rm -rf ${GITHUB_WORKSPACE}/*;
-        run: sudo chmod +w -R ${GITHUB_WORKSPACE}; sudo rm -rf ${GITHUB_WORKSPACE}/*;
-
+  update_latest_with_new_tag:
+    needs: build_and_push
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout gh-pages
         uses: actions/checkout@v4
         if: startsWith(github.ref, 'refs/tags/')
@@ -61,7 +58,6 @@ jobs:
           fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
 
       - name: Redirect latest to new release
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
             echo "Redirecting latest to newly released version ${{ env.RELEASE_VERSION }}"
             rm -rf latest
@@ -69,7 +65,6 @@ jobs:
 
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           add: "latest"
           message: "CI: Redirect latest to new version ${{ env.RELEASE_VERSION }}"
@@ -77,7 +72,6 @@ jobs:
           pathspec_error_handling: exitAtEnd
 
       - name: Push changes
-        if: startsWith(github.ref, 'refs/tags/')
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
