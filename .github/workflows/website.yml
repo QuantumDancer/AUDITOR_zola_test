@@ -1,0 +1,82 @@
+name: Website
+
+on: 
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set RELEASE_VERSION env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" | sed "s/main/edge/" >> $GITHUB_ENV
+
+      - name: Get URL to GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "GITHUB_PAGES_URL=$(gh api repos/$GITHUB_REPOSITORY/pages --jq '.html_url')" >> $GITHUB_ENV
+
+      - name: Checkout main/tag
+        uses: actions/checkout@v4
+
+      - name: Build only 
+        uses: shalzz/zola-deploy-action@master
+        env:
+          BUILD_DIR: media/website
+          BUILD_ONLY: true
+          BUILD_FLAGS: "--base-url ${{ env.GITHUB_PAGES_URL }}/${{ env.RELEASE_VERSION }}"
+          OUT_DIR: public
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy website
+        uses: JamesIves/github-pages-deploy-action@v4
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        with:
+          folder: media/website/public
+          target-folder: ${{ env.RELEASE_VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          clean: false
+
+      # Only for tag push: Update latest to new release version
+
+      # The "cleanup old checkout" step is needed because of this bug: https://github.com/actions/checkout/issues/1014
+      - name: Cleanup old checkout
+        if: startsWith(github.ref, 'refs/tags/')
+        run: chmod +w -R ${GITHUB_WORKSPACE}; rm -rf ${GITHUB_WORKSPACE}/*;
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          ref: gh-pages
+          fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+
+      - name: Redirect latest to new release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+            echo "Redirecting latest to newly released version ${{ env.RELEASE_VERSION }}"
+            rm -rf latest
+            ln -s $RELEASE_VERSION latest
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          add: "latest"
+          message: "CI: Redirect latest to new version ${{ env.RELEASE_VERSION }}"
+          default_author: "github_actions"
+          pathspec_error_handling: exitAtEnd
+
+      - name: Push changes
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
